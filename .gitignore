@@ -19,4 +19,6 @@ modules/*
 .idea
 temp
 
-.o
+*.o
+*a
+messages/main
