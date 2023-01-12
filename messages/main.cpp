@@ -48,8 +48,11 @@ int main() {
 
 		std::cout << "[Test #3]\n" << test_msg->DebugString() << "\n";
 #endif
+		::tutorial::ServerReqMsg_ToBeSend* tb = google::protobuf::Arena::CreateMessage<tutorial::ServerReqMsg_ToBeSend>(&arena);
+		tb->set_payload_size(test_msg->ByteSizeLong());
+		tb->set_allocated_payload(test_msg);
+		std::cout << "[Test #4]\n" << tb->DebugString() << "\n";
 
 	}
-
 	return 1;
 }
