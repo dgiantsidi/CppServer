@@ -1,0 +1,33 @@
+syntax = "proto2";
+
+package tutorial;
+
+message ServerReqMsg {
+
+	enum ReqType {
+		PUT = 0;
+		GET = 1;
+		EMPTY = 2;
+	}
+
+	message KV {
+		// FIXME: @dimitra the key_sz and value_sz might not be required.
+		required int32	key_sz = 1;
+		required int32	value_sz = 2;
+		required string key = 3;
+		required string value = 4;
+	}
+
+	message Req {
+		required ReqType rtype = 1;
+		required KV 	kv_pair = 2;
+	}
+
+	message Msg {
+		required int64 seq = 1;
+		repeated Req rtype = 2;
+	}
+
+	required Msg msg = 1;
+}
+
