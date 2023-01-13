@@ -19,8 +19,10 @@ modules/*
 .idea
 temp
 
+# Protobuf files
+messages/*.pb.*
+
+# Object files, some bins and static libs
 *.o
 *a
 messages/main
-*pb.h
-*pb.cc
