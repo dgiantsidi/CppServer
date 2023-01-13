@@ -102,7 +102,7 @@ class MulticastClient : public TCPClient
 
 					//fmt::print("seq={}\n", test_msg.seq());
 					if ((prev_cnt+1) != test_msg.seq()) {
-						fmt::print("[Error# 1] sequencers not as expected ...\n");
+						fmt::print("[Error# 2] sequencers not as expected (exp={}\treal={})...\n", (prev_cnt+1), test_msg.seq());
 					}
 					prev_cnt = test_msg.seq();
 					// fmt::print("{}\n", last_mem);
@@ -164,7 +164,7 @@ class MulticastClient : public TCPClient
 
 					//fmt::print("[Test #1] seq={}\n", test_msg.seq());
 					if ((prev_cnt+1) != test_msg.seq()) {
-						fmt::print("[Error# 1] sequencers not as expected ...\n");
+						fmt::print("[Error# 1] sequencers not as expected ({}\t{})...\n", (prev_cnt+1), test_msg.seq());
 					}
 					prev_cnt = test_msg.seq();
 #endif
