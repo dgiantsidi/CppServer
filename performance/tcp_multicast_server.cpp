@@ -7,8 +7,7 @@
 #include "system/cpu.h"
 #include "threads/thread.h"
 #include "time/timestamp.h"
-// #include "/home/dimitra/CppServer/messages/server_msg.pb.h"
-#include "messages/server_msg.pb.h"
+#include "msg.h"
 
 #include <atomic>
 #include <iostream>
@@ -120,53 +119,23 @@ int main(int argc, char** argv)
 	auto multicaster = std::thread([&server, &multicasting, messages_rate, message_size]()
 			{
 			// Prepare message to multicast
-			std::vector<uint8_t> message_to_send(message_size);
-			int seq = 0;
+			Msg m;
+			std::string output;
 
 			// Multicasting loop
 			while (multicasting)
 			{
 			auto start = UtcTimestamp();
 			for (int i = 0; i < messages_rate; ++i) {
-			//TODO: message serialization
-			google::protobuf::Arena arena;
-			std::string output;
-			tutorial::ServerReqMsg::Req* test_req;
-
-			tutorial::ServerReqMsg_KV* test_kv =  google::protobuf::Arena::CreateMessage<tutorial::ServerReqMsg_KV>(&arena);
-
-			test_kv->set_key_sz(sizeof("dimitra"));
-			test_kv->set_value_sz(sizeof("dimitra giantsidi"));
-			test_kv->set_key("dimitra");
-			test_kv->set_value("dimitra giantsidi");
-			test_req = google::protobuf::Arena::CreateMessage<tutorial::ServerReqMsg_Req>(&arena);
-			test_req->set_allocated_kv_pair(test_kv);
-			test_req->set_rtype(tutorial::ServerReqMsg_ReqType_PUT);
-
-			::tutorial::ServerReqMsg_Msg* test_msg = google::protobuf::Arena::CreateMessage<tutorial::ServerReqMsg_Msg>(&arena);
-			test_msg->set_seq(seq);
-
-			seq++;
-			for (size_t i = 0ULL; i < 1; i++) {
-				// tutorial::ServerReqMsg::Req* test_req =  google::protobuf::Arena::CreateMessage<tutorial::ServerReqMsg_Req>(&arena);
-				auto ptr = test_msg->add_rtype();
-				*ptr = *test_req;
+			auto [msg, size] = m.GetMsg(Msg::kMsgSize, Msg::kBatchSize, output);
+			server->Multicast(msg, size);
 			}
-
-			::tutorial::ServerReqMsg_ToBeSend* tb = google::protobuf::Arena::CreateMessage<tutorial::ServerReqMsg_ToBeSend>(&arena);
-			tb->set_payload_size(test_msg->ByteSizeLong());
-			tb->set_allocated_payload(test_msg);
-			tb->SerializeToString(&output);
-			server->Multicast(output.data(), output.size());
-		//	fmt::print("{} stream_size={}, payload_size={}, seq={}\n", __PRETTY_FUNCTION__, output.size(), tb->payload_size(), seq-1);
-			}
-			// server->Multicast(message_to_send.data(), message_to_send.size());
 			auto end = UtcTimestamp();
 
 			// Sleep for remaining time or yield
 			auto milliseconds = (end - start).milliseconds();
 			if (milliseconds < 1000)
-				Thread::Sleep(1000 - milliseconds);
+			Thread::Sleep(1000 - milliseconds);
 			else
 				Thread::Yield();
 			}
