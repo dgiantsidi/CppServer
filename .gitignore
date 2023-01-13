@@ -22,3 +22,5 @@ temp
 *.o
 *a
 messages/main
+*pb.h
+*pb.cc
