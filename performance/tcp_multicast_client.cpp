@@ -43,8 +43,14 @@ class MulticastClient : public TCPClient
 		int last_payload = -1;
 		int prev_cnt = -1;
 
+
+
 		void onReceived(const void* buffer, size_t size) override
 		{	
+			// process missing data from previous send/recv
+			// process messages
+			// update buffers if message is not complete
+			/
 			int processed_bytes = size;
 			if (hdr) {
 				auto missing = sizeof(int) - last_headers.size();
@@ -179,7 +185,6 @@ class MulticastClient : public TCPClient
 
 
 			total_bytes += processed_bytes;
-			// TODO: check_message(buffer, size);
 
 		}
 
