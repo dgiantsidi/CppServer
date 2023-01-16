@@ -72,9 +72,16 @@ class MulticastClient : public TCPClient
 						tb->ParsePartialFromString(output);
 						const ::tutorial::ServerReqMsg_Msg& test_msg = tb->payload(); 
 						fmt::print("[2] {}, consume the record:\toutput.size()=={}\tsequencer={}\tremaining_bytes={}\n", __PRETTY_FUNCTION__, output.size(), test_msg.seq(), size);
+						if ((prev_cnt+1) != test_msg.seq()) {
+							fmt::print("[10] {}:{}, sequencers not as expected (exp={}\treal={})...\n", __PRETTY_FUNCTION__,  std::hash<std::thread::id>()(std::this_thread::get_id()), (prev_cnt+1), test_msg.seq());
+							std::cout << " " << tb->DebugString() << "\n";
+							std::this_thread::sleep_for(std::chrono::milliseconds(5000));
+						}
+						prev_cnt += 1;
 						size = size - payload_sz;
 						hdr = false;
 						last_headers.clear();
+						buffer += missing + payload_sz;
 					}
 				}
 				else {
