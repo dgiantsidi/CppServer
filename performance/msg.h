@@ -20,7 +20,7 @@ struct Msg {
 
 		//FIXME: @dimitra allocate key/value space here appropriately
 		kv->set_key("dimitra");
-		kv->set_value("dimitra giantsidi");
+		kv->set_value("giantsidi" + std::to_string(sequencer) + ".....");
 		return kv;
 	}
 
@@ -36,7 +36,7 @@ struct Msg {
 
 		::tutorial::ServerReqMsg_Msg* msg = google::protobuf::Arena::CreateMessage<tutorial::ServerReqMsg_Msg>(&arena);
 		msg->set_seq(sequencer);
-
+	//	std::cout << msg->DebugString() << "\n";
 		sequencer++;
 		for (size_t i = 0ULL; i < batch_size; i++) {
 			auto ptr = msg->add_rtype();

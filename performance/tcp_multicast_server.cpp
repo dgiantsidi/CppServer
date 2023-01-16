@@ -127,7 +127,7 @@ int main(int argc, char** argv)
 			{
 			auto start = UtcTimestamp();
 			for (int i = 0; i < messages_rate; ++i) {
-			auto [msg, size] = m.GetMsg(Msg::kMsgSize, Msg::kBatchSize, output);
+			auto [msg, size] = m.GetMsg(Msg::kMsgSize, 1, output);
 			server->Multicast(msg, size);
 			}
 			auto end = UtcTimestamp();

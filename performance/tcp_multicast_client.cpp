@@ -44,40 +44,34 @@ class MulticastClient : public TCPClient
 		int prev_cnt = -1;
 
 
-
-		void onReceived(const void* buffer, size_t size) override
-		{	
-			// process missing data from previous send/recv
-			// process messages
-			// update buffers if message is not complete
-			/
-			int processed_bytes = size;
+		void process_interrupted_msg(const char *& buffer, size_t& size) {
 			if (hdr) {
 				auto missing = sizeof(int) - last_headers.size();
 				if (size > missing) {
 					google::protobuf::Arena arena;
+
 					last_headers.append(std::string(reinterpret_cast<const char*>(buffer), missing));
-					std::string tmp(last_headers, sizeof(int));
+					std::string tmp(last_headers.data(), sizeof(int));
+
 					::tutorial::ServerReqMsg_ToBeSend* tb = google::protobuf::Arena::CreateMessage<tutorial::ServerReqMsg_ToBeSend>(&arena);
 					tb->ParsePartialFromString(tmp);
 					size -= missing;
-					fmt::print(">>>> {} payload_size={} total_size={}\n", __PRETTY_FUNCTION__, tb->payload_size(), size);
+
+					fmt::print("[1] {}:{}, retrieving missing headers:\tpayload_size={}\tremaining_bytes={}\n", __PRETTY_FUNCTION__, std::hash<std::thread::id>()(std::this_thread::get_id()), tb->payload_size(), size);
 					int payload_sz = tb->payload_size();
+
 					if (payload_sz > size) {
-						// need to keep memo
+						// TODO: need to keep memo
+						fmt::print("HERE\n");
 					}
 					else {
-						// consume this record
-						// reset hdrs
-						// and proceed
-						output = std::string(reinterpret_cast<const char*>(buffer), payload_sz);
+						// consume this record, reset hdr and last_headers, and then procceed
+						output = std::string(last_headers.data(), last_headers.size());
+						output.append(std::string(reinterpret_cast<const char*>(buffer) + missing, payload_sz));
 						::tutorial::ServerReqMsg_ToBeSend* tb = google::protobuf::Arena::CreateMessage<tutorial::ServerReqMsg_ToBeSend>(&arena);
-						if (tb->ParseFromString(output) == true) {
-							//						fmt::print("{} size={}, payload_sz={}\n", __func__, size, payload_sz);
-							//						std::this_thread::sleep_for(std::chrono::milliseconds(5000));
-						}
+						tb->ParsePartialFromString(output);
 						const ::tutorial::ServerReqMsg_Msg& test_msg = tb->payload(); 
-						fmt::print(">>>>>[Test #1] output.size()=={} seq={} left_bytes={}\n", output.size(), test_msg.seq(), size);
+						fmt::print("[2] {}, consume the record:\toutput.size()=={}\tsequencer={}\tremaining_bytes={}\n", __PRETTY_FUNCTION__, output.size(), test_msg.seq(), size);
 						size = size - payload_sz;
 						hdr = false;
 						last_headers.clear();
@@ -86,36 +80,35 @@ class MulticastClient : public TCPClient
 				else {
 					last_headers.append(std::string(reinterpret_cast<const char*>(buffer), size));
 					size = 0;
+					fmt::print("HERE2\n");
 				}
+				return;
 
 			}
+
 			if (last_payload > 0) {
-				auto missing = last_payload - (last_mem.size() -sizeof(int)) ;
+				auto missing = last_payload - (last_mem.size() - sizeof(int)) ;
 				if (size >= missing) {
-					//consume last record
+					// consume last record
 					last_mem.append(std::string(reinterpret_cast<const char*>(buffer), missing));
-					buffer+= missing;
+					buffer += missing;
 					size -= missing;
+
+
 					google::protobuf::Arena arena;
 					::tutorial::ServerReqMsg_ToBeSend* tb = google::protobuf::Arena::CreateMessage<tutorial::ServerReqMsg_ToBeSend>(&arena);
-					if (tb->ParseFromString(last_mem) != true) {
-						// fmt::print("Here = {} size={}, last_payload_sz={}\n", __func__, size, last_payload);
-						// std::this_thread::sleep_for(std::chrono::milliseconds(1));
-					}
+					tb->ParseFromString(last_mem);
 					const ::tutorial::ServerReqMsg_Msg& test_msg = tb->payload(); 
-					// fmt::print("[Test #2] here2 = output.size()=={} seq={} left_bytes={}, last_payload={}\n", last_mem.size(), test_msg.seq(), size, last_payload);
-					
-
-					//fmt::print("seq={}\n", test_msg.seq());
 					if ((prev_cnt+1) != test_msg.seq()) {
-						fmt::print("[Error# 2] sequencers not as expected (exp={}\treal={})...\n", (prev_cnt+1), test_msg.seq());
+						fmt::print("[3] {}:{}, sequencers not as expected (exp={}\treal={})...\n", __PRETTY_FUNCTION__,  std::hash<std::thread::id>()(std::this_thread::get_id()), (prev_cnt+1), test_msg.seq());
+						std::cout << " " << tb->DebugString() << "\n";
+						std::this_thread::sleep_for(std::chrono::milliseconds(5000));
 					}
-					prev_cnt = test_msg.seq();
-					// fmt::print("{}\n", last_mem);
+					// reset last_payload + last_mem
+					// prev_cnt = test_msg.seq();
+					prev_cnt += 1;
 					last_payload = -1;
 					last_mem.clear();
-					//increase metrics
-					//reset last_payload + last_mem
 				}
 				else {
 					// update the last_mem
@@ -123,6 +116,21 @@ class MulticastClient : public TCPClient
 					size = 0;
 				}
 			}
+
+		}
+
+		void onReceived(const void* _buffer, size_t size) override
+		{	
+			int processed_bytes = size;
+
+			// remove const qualifier here (oops!)
+			auto buffer = reinterpret_cast<const char*>(_buffer);
+
+			// process missing data from previous send/recv
+			process_interrupted_msg(buffer, size);
+
+			// process messages and update buffers if message is not complete
+
 			while (size != 0) {
 				google::protobuf::Arena arena;
 				int payload_sz = 0;
@@ -134,51 +142,64 @@ class MulticastClient : public TCPClient
 					// todo last memo
 					hdr = true;
 					last_headers = std::string(reinterpret_cast<const char*>(buffer), size);
-					fmt::print("{} did not retrieved headers yet\n", __PRETTY_FUNCTION__);
-					std::this_thread::sleep_for(std::chrono::milliseconds(5000));
+					fmt::print("[4] {}:{} we did not retrieved headers (size={}) yet\n", __PRETTY_FUNCTION__, std::hash<std::thread::id>()(std::this_thread::get_id()), size);
+	//				std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+					size = 0;
 					break;
 				}
 				else {
 					std::string tmp(reinterpret_cast<const char*>(buffer), sizeof(int));
 					::tutorial::ServerReqMsg_ToBeSend* tb = google::protobuf::Arena::CreateMessage<tutorial::ServerReqMsg_ToBeSend>(&arena);
 					tb->ParsePartialFromString(tmp);
-					// fmt::print("{} payload_size={} total_size={}\n", __PRETTY_FUNCTION__, tb->payload_size(), size);
+#if PRINT_DEBUG
+					fmt::print("[5] {}\tpayload_size={} total_size={}\n", __PRETTY_FUNCTION__, tb->payload_size(), size);
+#endif
 					payload_sz = tb->payload_size();
 				}
 
 				if (payload_sz > size - sizeof(int)) {
-					// fmt::print("{} did not received the entire message yet (payload={}, left_bytes={})\n", __PRETTY_FUNCTION__, payload_sz, (size-sizeof(int)));
-					// last memo
+#if 0
+					fmt::print("[6] {} did not received the entire message yet (payload={}, left_bytes={}, cur_seq={})\n", __PRETTY_FUNCTION__, payload_sz, (size-sizeof(int)), prev_cnt);
+#endif
+					// update last memo
 					last_payload = payload_sz;
 					last_mem = std::string(reinterpret_cast<const char*>(buffer), size);
-	//				std::this_thread::sleep_for(std::chrono::milliseconds(5000));
+	//				std::this_thread::sleep_for(std::chrono::milliseconds(1000));
 					size = 0;
-					// break;
 				}
 				else {
 					// we got all the message
-#if 1
 					output = std::string(reinterpret_cast<const char*>(buffer), payload_sz);
 					::tutorial::ServerReqMsg_ToBeSend* tb = google::protobuf::Arena::CreateMessage<tutorial::ServerReqMsg_ToBeSend>(&arena);
+
 					if (tb->ParseFromString(output) == true) {
-						//						fmt::print("{} size={}, payload_sz={}\n", __func__, size, payload_sz);
-						//						std::this_thread::sleep_for(std::chrono::milliseconds(5000));
+#if PRINT_DEBUG
+						fmt::print("[7] {}, size={}, payload_sz={}\n", __func__, size, payload_sz);
+						std::this_thread::sleep_for(std::chrono::milliseconds(5000));
+#endif
 					}
 					const ::tutorial::ServerReqMsg_Msg& test_msg = tb->payload(); 
-					// fmt::print("[Test #1] output.size()=={} seq={} left_bytes={}\n", output.size(), test_msg.seq(), size);
-					
-
-					//fmt::print("[Test #1] seq={}\n", test_msg.seq());
-					if ((prev_cnt+1) != test_msg.seq()) {
-						fmt::print("[Error# 1] sequencers not as expected ({}\t{})...\n", (prev_cnt+1), test_msg.seq());
-					}
-					prev_cnt = test_msg.seq();
+#if PRINT_DEBUG
+					fmt::print("[8] {}:{}, output.size()=={} received_seq={} left_bytes={}\n", __PRETTY_FUNCTION__,  std::hash<std::thread::id>()(std::this_thread::get_id()), output.size(), test_msg.seq(), size);
+					// fmt::print("{}\n", tb->DebugString());
 #endif
+
+
+					if ((prev_cnt+1) != test_msg.seq()) {
+						fmt::print("{}:{}\t[Error] sequencers not as expected (exp={}\treceived={})...\n", __PRETTY_FUNCTION__, std::hash<std::thread::id>()(std::this_thread::get_id()), (prev_cnt+1), test_msg.seq());
+
+						fmt::print("{}\n", tb->DebugString());
+						std::this_thread::sleep_for(std::chrono::milliseconds(5000));
+					}
+					prev_cnt += 1;
+					// prev_cnt = test_msg.seq();
 					size = size - sizeof(int) - payload_sz;
 				}
 
 				if ((size) > 0) {
-					// fmt::print("{} we received {} extra bytes\n", __PRETTY_FUNCTION__, (size));
+#if PRINT_DEBUG
+					fmt::print("[9] {}, we received {} extra bytes\n", __PRETTY_FUNCTION__, (size));
+#endif
 					buffer += payload_sz + sizeof(int);
 				}
 			}
@@ -262,7 +283,7 @@ int main(int argc, char** argv)
 	std::cout << "All clients connected!" << std::endl;
 
 	// Wait for benchmarking
-	std::cout << "Benchmarking...";
+	fmt::print("\n{} Benhcmarking \n", __PRETTY_FUNCTION__);
 	Thread::Sleep(seconds_count * 1000);
 	std::cout << "Done!" << std::endl;
 

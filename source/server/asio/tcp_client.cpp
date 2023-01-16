@@ -673,6 +673,7 @@ size_t TCPClient::Receive(void* buffer, size_t size)
         // Update statistic
         _bytes_received += received;
 
+	fmt::print("{} received={}\n", __PRETTY_FUNCTION__, received);
         // Call the buffer received handler
         onReceived(buffer, received);
     }
@@ -743,6 +744,7 @@ size_t TCPClient::Receive(void* buffer, size_t size, const CppCommon::Timespan& 
         // Update statistic
         _bytes_received += received;
 
+	fmt::print("{} received={}\n", __PRETTY_FUNCTION__, received);
         // Call the buffer received handler
         onReceived(buffer, received);
     }
@@ -794,6 +796,7 @@ void TCPClient::TryReceive()
             // Update statistic
             _bytes_received += size;
 
+	   // fmt::print("{} received={}\n", __PRETTY_FUNCTION__, size);
             // Call the buffer received handler
             onReceived(_receive_buffer.data(), size);
 

@@ -29,9 +29,9 @@ message ServerReqMsg {
 	}
 
 	required Msg msg = 1;
-message ToBeSend {
-	required int32 payload_size = 1;
-	required Msg payload = 2;
-}
+	message ToBeSend {
+		required int32 payload_size = 1;
+		optional Msg payload = 2;
+	}
 }
 
